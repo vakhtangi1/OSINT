@@ -42,6 +42,11 @@ public class PersonRecordController {
         return personRecordService.searchByFullName(name);
     }
 
+    @GetMapping("/global-search")
+    public List<PersonRecord> globalSearch(@RequestParam String query) {
+        return personRecordService.globalSearch(query);
+    }
+
     @PutMapping("/{id}")
     public PersonRecord updateRecord(@PathVariable Long id, @RequestBody PersonRecord record) {
         return personRecordService.updateRecord(id, record);

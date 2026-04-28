@@ -2,6 +2,7 @@ package com.osint.backend.service;
 
 import com.osint.backend.model.PersonRecord;
 import com.osint.backend.repository.PersonRecordRepository;
+import com.osint.backend.security.CryptoUtil;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -24,8 +25,12 @@ public class PersonRecordService {
         }
 
         if (record.getFullName() == null || record.getFullName().isBlank()) {
-            record.setFullName((record.getFirstName() + " " + record.getLastName()).trim());
+            String firstName = record.getFirstName() == null ? "" : record.getFirstName();
+            String lastName = record.getLastName() == null ? "" : record.getLastName();
+            record.setFullName((firstName + " " + lastName).trim());
         }
+
+        prepareSearchAndHashes(record);
 
         return personRecordRepository.save(record);
     }
@@ -47,6 +52,15 @@ public class PersonRecordService {
         return personRecordRepository.findByFullNameContainingIgnoreCase(name);
     }
 
+    public List<PersonRecord> globalSearch(String query) {
+        String safeQuery = query == null ? "" : query.trim().toLowerCase();
+
+        String emailHash = CryptoUtil.hmacHash(normalizeEmail(safeQuery));
+        String phoneHash = CryptoUtil.hmacHash(normalizePhone(safeQuery));
+
+        return personRecordRepository.globalSearch(safeQuery, emailHash, phoneHash);
+    }
+
     public PersonRecord updateRecord(Long id, PersonRecord updatedRecord) {
         PersonRecord existing = getRecordById(id);
 
@@ -66,10 +80,50 @@ public class PersonRecordService {
         existing.setNotes(updatedRecord.getNotes());
         existing.setConfidenceScore(updatedRecord.getConfidenceScore());
 
+        prepareSearchAndHashes(existing);
+
         return personRecordRepository.save(existing);
     }
 
     public void deleteRecord(Long id) {
         personRecordRepository.deleteById(id);
+    }
+
+    private void prepareSearchAndHashes(PersonRecord record) {
+        record.setSearchText(buildSearchText(record));
+        record.setEmailHash(CryptoUtil.hmacHash(normalizeEmail(record.getEmail())));
+        record.setPhoneHash(CryptoUtil.hmacHash(normalizePhone(record.getPhoneNumber())));
+    }
+
+    private String buildSearchText(PersonRecord record) {
+        return String.join(" ",
+                safe(record.getFirstName()),
+                safe(record.getLastName()),
+                safe(record.getFullName()),
+                safe(record.getJobTitle()),
+                safe(record.getCompany()),
+                safe(record.getLocation()),
+                safe(record.getSourceType())
+        ).toLowerCase();
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+
+        return email.trim().toLowerCase();
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+
+        return phone.replaceAll("[^0-9+]", "");
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

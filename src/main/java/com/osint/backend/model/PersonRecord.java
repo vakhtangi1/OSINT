@@ -1,6 +1,8 @@
 package com.osint.backend.model;
 
+import com.osint.backend.security.EncryptedStringConverter;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -21,21 +23,43 @@ public class PersonRecord {
     private String company;
     private String location;
 
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 1000)
     private String email;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 1000)
     private String phoneNumber;
 
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 2000)
     private String profilePhotoUrl;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(length = 2000)
     private String sourceUrl;
+
     private String sourceType;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(columnDefinition = "TEXT")
     private String collectedText;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(columnDefinition = "TEXT")
     private String notes;
 
     private Double confidenceScore;
     private LocalDateTime createdAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String searchText;
+
+    @Column(length = 255)
+    private String emailHash;
+
+    @Column(length = 255)
+    private String phoneHash;
 
     public PersonRecord() {}
 
@@ -89,4 +113,13 @@ public class PersonRecord {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getSearchText() { return searchText; }
+    public void setSearchText(String searchText) { this.searchText = searchText; }
+
+    public String getEmailHash() { return emailHash; }
+    public void setEmailHash(String emailHash) { this.emailHash = emailHash; }
+
+    public String getPhoneHash() { return phoneHash; }
+    public void setPhoneHash(String phoneHash) { this.phoneHash = phoneHash; }
 }
