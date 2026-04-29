@@ -16,9 +16,17 @@ const API = "http://localhost:8080/api";
 function TopUserBar({ onLogout }) {
   return (
       <div className="top-user-bar">
-      <span>
+        <Link className="admin-link" to="/admin/audit-logs">
+          Security Logs
+        </Link>
+
+        <Link className="admin-link" to="/">
+          Dashboard
+        </Link>
+
+        <span>
         Logged in as {localStorage.getItem("username")} (
-        {localStorage.getItem("role")})
+          {localStorage.getItem("role")})
       </span>
 
         <button
@@ -590,6 +598,154 @@ function PersonDetails() {
   );
 }
 
+function AdminAuditLogs() {
+  const [logs, setLogs] = useState([]);
+  const [actor, setActor] = useState("");
+  const [action, setAction] = useState("");
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    loadLogs();
+  }, [page]);
+
+  async function loadLogs() {
+    try {
+      const params = {
+        page,
+        size: 25,
+      };
+
+      if (actor.trim()) params.actor = actor.trim();
+      if (action.trim()) params.action = action.trim();
+
+      const data = await apiFetch(
+          `/audit-logs?page=${params.page}&size=${params.size}` +
+          `${params.actor ? `&actor=${encodeURIComponent(params.actor)}` : ""}` +
+          `${params.action ? `&action=${encodeURIComponent(params.action)}` : ""}`
+      );
+
+      setLogs(data.content || []);
+    } catch (err) {
+      console.error(err);
+      setLogs([]);
+    }
+  }
+
+  return (
+      <div className="page">
+        <section className="case-detail-card">
+          <h1>Admin Security Dashboard</h1>
+
+          <div className="detail-description">
+            <h3>Audit Monitoring</h3>
+            <p>
+              Track authentication, MFA verification, record creation, updates,
+              deletes, imports, exports, and other system activity.
+            </p>
+          </div>
+        </section>
+
+        <section className="card">
+          <h2>Audit Log Filters</h2>
+
+          <div className="query-row">
+            <input
+                placeholder="Filter by actor / username"
+                value={actor}
+                onChange={(e) => setActor(e.target.value)}
+            />
+
+            <select value={action} onChange={(e) => setAction(e.target.value)}>
+              <option value="">All Actions</option>
+              <option value="LOGIN">LOGIN</option>
+              <option value="REGISTER">REGISTER</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+              <option value="SEARCH">SEARCH</option>
+              <option value="IMPORT">IMPORT</option>
+              <option value="EXPORT">EXPORT</option>
+            </select>
+
+            <button
+                onClick={() => {
+                  setPage(0);
+                  loadLogs();
+                }}
+            >
+              Apply Filter
+            </button>
+
+            <button
+                className="edit-btn"
+                onClick={() => {
+                  setActor("");
+                  setAction("");
+                  setPage(0);
+                  setTimeout(loadLogs, 100);
+                }}
+            >
+              Reset
+            </button>
+          </div>
+        </section>
+
+        <section className="card">
+          <h2>System Audit Logs</h2>
+
+          {logs.length === 0 ? (
+              <p className="empty-text">No audit logs found.</p>
+          ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>ID</th>
+                    <th>Details</th>
+                  </tr>
+                  </thead>
+
+                  <tbody>
+                  {logs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{formatDate(log.timestamp)}</td>
+                        <td>{log.actor || "unknown"}</td>
+                        <td>
+                      <span className={`status-pill audit-${log.action}`}>
+                        {log.action}
+                      </span>
+                        </td>
+                        <td>{log.entityType}</td>
+                        <td>{log.entityId || "-"}</td>
+                        <td>{log.detail}</td>
+                      </tr>
+                  ))}
+                  </tbody>
+                </table>
+              </div>
+          )}
+
+          <div className="audit-pagination">
+            <button
+                disabled={page === 0}
+                onClick={() => setPage(Math.max(0, page - 1))}
+            >
+              Previous
+            </button>
+
+            <span>Page {page + 1}</span>
+
+            <button onClick={() => setPage(page + 1)}>Next</button>
+          </div>
+        </section>
+      </div>
+  );
+}
+
 function formatDate(value) {
   if (!value) return "";
   return String(value).replace("T", "\n");
@@ -612,6 +768,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/case/:id" element={<CaseDetails />} />
           <Route path="/person/:id" element={<PersonDetails />} />
+          <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
         </Routes>
       </BrowserRouter>
   );

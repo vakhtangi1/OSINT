@@ -62,3 +62,15 @@ export async function verifyMfa(payload) {
         body: JSON.stringify(payload),
     });
 }
+
+export async function getAuditLogs(params = {}) {
+    const query = new URLSearchParams();
+
+    query.set("page", params.page || 0);
+    query.set("size", params.size || 25);
+
+    if (params.actor) query.set("actor", params.actor);
+    if (params.action) query.set("action", params.action);
+
+    return apiFetch(`/audit-logs?${query.toString()}`);
+}

@@ -489,3 +489,68 @@ td {
   color: #e5e7eb;
   border: 1px solid #465a78;
 }
+.admin-link {
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #93c5fd;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.audit-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin-top: 24px;
+  color: #93c5fd;
+  font-weight: 800;
+}
+
+.audit-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status-pill.audit-LOGIN {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+}
+
+.status-pill.audit-REGISTER {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+}
+
+.status-pill.audit-CREATE {
+  background: rgba(14, 165, 233, 0.2);
+  color: #7dd3fc;
+}
+
+.status-pill.audit-UPDATE {
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+}
+
+.status-pill.audit-DELETE {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.status-pill.audit-SEARCH {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.status-pill.audit-IMPORT,
+.status-pill.audit-EXPORT {
+  background: rgba(20, 184, 166, 0.2);
+  color: #2dd4bf;
+}
