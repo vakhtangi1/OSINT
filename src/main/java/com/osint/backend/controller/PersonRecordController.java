@@ -2,6 +2,7 @@ package com.osint.backend.controller;
 
 import com.osint.backend.model.PersonRecord;
 import com.osint.backend.service.PersonRecordService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,8 +19,9 @@ public class PersonRecordController {
     }
 
     @PostMapping
-    public PersonRecord createRecord(@RequestBody PersonRecord record) {
-        return personRecordService.createRecord(record);
+    public PersonRecord createRecord(@RequestBody PersonRecord record,
+                                     Authentication auth) {
+        return personRecordService.createRecord(record, actor(auth));
     }
 
     @GetMapping
@@ -38,8 +40,12 @@ public class PersonRecordController {
     }
 
     @GetMapping("/search")
-    public List<PersonRecord> searchByFullName(@RequestParam String name) {
-        return personRecordService.searchByFullName(name);
+    public List<PersonRecord> search(@RequestParam(required = false) String name,
+                                     @RequestParam(required = false) String query) {
+        if (query != null && !query.isBlank()) {
+            return personRecordService.globalSearch(query);
+        }
+        return personRecordService.searchByFullName(name == null ? "" : name);
     }
 
     @GetMapping("/global-search")
@@ -48,13 +54,19 @@ public class PersonRecordController {
     }
 
     @PutMapping("/{id}")
-    public PersonRecord updateRecord(@PathVariable Long id, @RequestBody PersonRecord record) {
-        return personRecordService.updateRecord(id, record);
+    public PersonRecord updateRecord(@PathVariable Long id,
+                                     @RequestBody PersonRecord record,
+                                     Authentication auth) {
+        return personRecordService.updateRecord(id, record, actor(auth));
     }
 
     @DeleteMapping("/{id}")
-    public String deleteRecord(@PathVariable Long id) {
-        personRecordService.deleteRecord(id);
+    public String deleteRecord(@PathVariable Long id, Authentication auth) {
+        personRecordService.deleteRecord(id, actor(auth));
         return "Person record deleted successfully";
+    }
+
+    private String actor(Authentication auth) {
+        return (auth != null) ? auth.getName() : "unknown";
     }
 }

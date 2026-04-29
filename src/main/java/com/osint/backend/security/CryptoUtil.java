@@ -1,5 +1,9 @@
 package com.osint.backend.security;
 
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
@@ -9,138 +13,95 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+/**
+ * AES-GCM encryption + HMAC-SHA256 hashing utility.
+ * Key is injected from application.properties (osint.crypto.key).
+ * Registered as a Spring @Component so the EncryptedStringConverter can use it.
+ */
+@Component
 public class CryptoUtil {
 
-    private static final String AES = "AES";
-    private static final String AES_GCM = "AES/GCM/NoPadding";
+    private static final String AES         = "AES";
+    private static final String AES_GCM     = "AES/GCM/NoPadding";
     private static final String HMAC_SHA256 = "HmacSHA256";
+    private static final int    IV_LENGTH   = 12;
+    private static final int    TAG_LENGTH  = 128;
 
-    private static final int IV_LENGTH = 12;
-    private static final int TAG_LENGTH = 128;
+    // Injected from application.properties
+    @Value("${osint.crypto.key}")
+    private String cryptoKeyRaw;
 
-    private static final String DEFAULT_DEV_KEY =
-            "ChangeThisDevKeyForRealProduction123";
+    // Singleton accessible to the JPA converter (which is not Spring-managed)
+    private static byte[] keyBytes;
 
-    private static byte[] getKeyBytes() {
+    @PostConstruct
+    private void init() {
         try {
-            String key = System.getenv("OSINT_CRYPTO_KEY");
+            String key = cryptoKeyRaw;
 
-            if (key == null || key.isBlank()) {
-                key = System.getProperty(
-                        "OSINT_CRYPTO_KEY",
-                        DEFAULT_DEV_KEY
-                );
+            // Allow override via OS environment variable at runtime
+            String envKey = System.getenv("OSINT_CRYPTO_KEY");
+            if (envKey != null && !envKey.isBlank()) {
+                key = envKey;
             }
 
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-
-            return digest.digest(
-                    key.getBytes(StandardCharsets.UTF_8)
-            );
-
+            keyBytes = digest.digest(key.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            throw new RuntimeException("Key generation failed", e);
+            throw new RuntimeException("CryptoUtil key initialisation failed", e);
         }
     }
 
-    public static String encrypt(String plainText) {
-        try {
-            if (plainText == null || plainText.isBlank()) {
-                return plainText;
-            }
+    // ── Static helpers (used by EncryptedStringConverter) ────────────────────
 
+    public static String encrypt(String plainText) {
+        if (plainText == null || plainText.isBlank()) return plainText;
+        try {
             byte[] iv = new byte[IV_LENGTH];
             new SecureRandom().nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance(AES_GCM);
+            cipher.init(Cipher.ENCRYPT_MODE,
+                    new SecretKeySpec(keyBytes, AES),
+                    new GCMParameterSpec(TAG_LENGTH, iv));
 
-            SecretKeySpec keySpec =
-                    new SecretKeySpec(getKeyBytes(), AES);
-
-            GCMParameterSpec gcmSpec =
-                    new GCMParameterSpec(TAG_LENGTH, iv);
-
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
-
-            byte[] encrypted =
-                    cipher.doFinal(
-                            plainText.getBytes(StandardCharsets.UTF_8)
-                    );
+            byte[] encrypted = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
 
             return "v1:"
                     + Base64.getEncoder().encodeToString(iv)
                     + ":"
                     + Base64.getEncoder().encodeToString(encrypted);
-
         } catch (Exception e) {
             throw new RuntimeException("Encryption failed", e);
         }
     }
 
     public static String decrypt(String encryptedText) {
+        if (encryptedText == null || encryptedText.isBlank()) return encryptedText;
+        if (!encryptedText.startsWith("v1:")) return encryptedText; // legacy plaintext pass-through
         try {
-            if (encryptedText == null || encryptedText.isBlank()) {
-                return encryptedText;
-            }
-
-            if (!encryptedText.startsWith("v1:")) {
-                return encryptedText;
-            }
-
-            String[] parts = encryptedText.split(":");
-
-            byte[] iv =
-                    Base64.getDecoder().decode(parts[1]);
-
-            byte[] encrypted =
-                    Base64.getDecoder().decode(parts[2]);
+            String[] parts    = encryptedText.split(":");
+            byte[]   iv       = Base64.getDecoder().decode(parts[1]);
+            byte[]   encrypted = Base64.getDecoder().decode(parts[2]);
 
             Cipher cipher = Cipher.getInstance(AES_GCM);
+            cipher.init(Cipher.DECRYPT_MODE,
+                    new SecretKeySpec(keyBytes, AES),
+                    new GCMParameterSpec(TAG_LENGTH, iv));
 
-            SecretKeySpec keySpec =
-                    new SecretKeySpec(getKeyBytes(), AES);
-
-            GCMParameterSpec gcmSpec =
-                    new GCMParameterSpec(TAG_LENGTH, iv);
-
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
-
-            byte[] decrypted = cipher.doFinal(encrypted);
-
-            return new String(
-                    decrypted,
-                    StandardCharsets.UTF_8
-            );
-
+            return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
         } catch (Exception e) {
             throw new RuntimeException("Decryption failed", e);
         }
     }
 
     public static String hmacHash(String value) {
+        if (value == null || value.isBlank()) return null;
         try {
-            if (value == null || value.isBlank()) {
-                return null;
-            }
-
             Mac mac = Mac.getInstance(HMAC_SHA256);
-
-            SecretKeySpec keySpec =
-                    new SecretKeySpec(
-                            getKeyBytes(),
-                            HMAC_SHA256
-                    );
-
-            mac.init(keySpec);
-
-            byte[] hash =
-                    mac.doFinal(
-                            value.getBytes(StandardCharsets.UTF_8)
-                    );
-
-            return Base64.getEncoder()
-                    .encodeToString(hash);
-
+            mac.init(new SecretKeySpec(keyBytes, HMAC_SHA256));
+            return Base64.getEncoder().encodeToString(
+                    mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
             throw new RuntimeException("Hash failed", e);
         }

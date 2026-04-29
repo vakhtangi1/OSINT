@@ -2,6 +2,7 @@ package com.osint.backend.controller;
 
 import com.osint.backend.dto.AuthResponse;
 import com.osint.backend.dto.LoginRequest;
+import com.osint.backend.dto.MfaVerifyRequest;
 import com.osint.backend.dto.RegisterRequest;
 import com.osint.backend.service.AuthService;
 import org.springframework.web.bind.annotation.*;
@@ -25,5 +26,10 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/mfa/verify")
+    public AuthResponse verifyMfa(@RequestBody MfaVerifyRequest request) {
+        return authService.verifyMfa(request);
     }
 }

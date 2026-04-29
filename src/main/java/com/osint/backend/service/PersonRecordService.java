@@ -1,5 +1,6 @@
 package com.osint.backend.service;
 
+import com.osint.backend.model.AuditLog;
 import com.osint.backend.model.PersonRecord;
 import com.osint.backend.repository.PersonRecordRepository;
 import com.osint.backend.security.CryptoUtil;
@@ -12,27 +13,34 @@ import java.util.List;
 public class PersonRecordService {
 
     private final PersonRecordRepository personRecordRepository;
+    private final AuditLogService auditLogService;
 
-    public PersonRecordService(PersonRecordRepository personRecordRepository) {
+    public PersonRecordService(PersonRecordRepository personRecordRepository,
+                               AuditLogService auditLogService) {
         this.personRecordRepository = personRecordRepository;
+        this.auditLogService = auditLogService;
     }
 
-    public PersonRecord createRecord(PersonRecord record) {
+    public PersonRecord createRecord(PersonRecord record, String actor) {
         record.setCreatedAt(LocalDateTime.now());
 
         if (record.getConfidenceScore() == null) {
             record.setConfidenceScore(0.5);
         }
 
-        if (record.getFullName() == null || record.getFullName().isBlank()) {
-            String firstName = record.getFirstName() == null ? "" : record.getFirstName();
-            String lastName = record.getLastName() == null ? "" : record.getLastName();
-            record.setFullName((firstName + " " + lastName).trim());
-        }
-
         prepareSearchAndHashes(record);
 
-        return personRecordRepository.save(record);
+        PersonRecord saved = personRecordRepository.save(record);
+
+        auditLogService.log(
+                actor,
+                AuditLog.Action.CREATE,
+                "PERSON_RECORD",
+                saved.getId(),
+                "Created person record: " + safeName(saved)
+        );
+
+        return saved;
     }
 
     public List<PersonRecord> getAllRecords() {
@@ -53,15 +61,26 @@ public class PersonRecordService {
     }
 
     public List<PersonRecord> globalSearch(String query) {
-        String safeQuery = query == null ? "" : query.trim().toLowerCase();
+        if (query == null || query.isBlank()) {
+            return personRecordRepository.findAll();
+        }
 
-        String emailHash = CryptoUtil.hmacHash(normalizeEmail(safeQuery));
-        String phoneHash = CryptoUtil.hmacHash(normalizePhone(safeQuery));
+        String cleanQuery = query.trim().toLowerCase();
 
-        return personRecordRepository.globalSearch(safeQuery, emailHash, phoneHash);
+        String emailHash = CryptoUtil.hmacHash(cleanQuery);
+        String phoneHash = CryptoUtil.hmacHash(cleanQuery);
+
+        List<PersonRecord> hashResults =
+                personRecordRepository.findByEmailHashOrPhoneHash(emailHash, phoneHash);
+
+        if (!hashResults.isEmpty()) {
+            return hashResults;
+        }
+
+        return personRecordRepository.searchBySearchText(cleanQuery);
     }
 
-    public PersonRecord updateRecord(Long id, PersonRecord updatedRecord) {
+    public PersonRecord updateRecord(Long id, PersonRecord updatedRecord, String actor) {
         PersonRecord existing = getRecordById(id);
 
         existing.setCaseId(updatedRecord.getCaseId());
@@ -82,48 +101,66 @@ public class PersonRecordService {
 
         prepareSearchAndHashes(existing);
 
-        return personRecordRepository.save(existing);
+        PersonRecord saved = personRecordRepository.save(existing);
+
+        auditLogService.log(
+                actor,
+                AuditLog.Action.UPDATE,
+                "PERSON_RECORD",
+                saved.getId(),
+                "Updated person record: " + safeName(saved)
+        );
+
+        return saved;
     }
 
-    public void deleteRecord(Long id) {
+    public void deleteRecord(Long id, String actor) {
+        PersonRecord existing = getRecordById(id);
+
         personRecordRepository.deleteById(id);
+
+        auditLogService.log(
+                actor,
+                AuditLog.Action.DELETE,
+                "PERSON_RECORD",
+                id,
+                "Deleted person record: " + safeName(existing)
+        );
     }
 
     private void prepareSearchAndHashes(PersonRecord record) {
-        record.setSearchText(buildSearchText(record));
-        record.setEmailHash(CryptoUtil.hmacHash(normalizeEmail(record.getEmail())));
-        record.setPhoneHash(CryptoUtil.hmacHash(normalizePhone(record.getPhoneNumber())));
-    }
+        String email = clean(record.getEmail());
+        String phone = clean(record.getPhoneNumber());
 
-    private String buildSearchText(PersonRecord record) {
-        return String.join(" ",
+        record.setEmailHash(CryptoUtil.hmacHash(email));
+        record.setPhoneHash(CryptoUtil.hmacHash(phone));
+
+        String searchText = String.join(" ",
                 safe(record.getFirstName()),
                 safe(record.getLastName()),
                 safe(record.getFullName()),
-                safe(record.getJobTitle()),
                 safe(record.getCompany()),
+                safe(record.getJobTitle()),
                 safe(record.getLocation()),
                 safe(record.getSourceType())
         ).toLowerCase();
+
+        record.setSearchText(searchText);
     }
 
-    private String normalizeEmail(String email) {
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-
-        return email.trim().toLowerCase();
-    }
-
-    private String normalizePhone(String phone) {
-        if (phone == null || phone.isBlank()) {
-            return null;
-        }
-
-        return phone.replaceAll("[^0-9+]", "");
+    private String clean(String value) {
+        return value == null ? null : value.trim();
     }
 
     private String safe(String value) {
-        return value == null ? "" : value.trim();
+        return value == null ? "" : value;
+    }
+
+    private String safeName(PersonRecord record) {
+        if (record.getFullName() != null && !record.getFullName().isBlank()) {
+            return record.getFullName();
+        }
+
+        return (safe(record.getFirstName()) + " " + safe(record.getLastName())).trim();
     }
 }
