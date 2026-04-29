@@ -1,11 +1,13 @@
 package com.osint.backend.controller;
 
+import com.osint.backend.model.AuditLog;
 import com.osint.backend.model.CaseRecord;
 import com.osint.backend.model.PersonRecord;
 import com.osint.backend.model.SourceRecord;
 import com.osint.backend.repository.CaseRepository;
 import com.osint.backend.repository.PersonRecordRepository;
 import com.osint.backend.repository.SourceRecordRepository;
+import com.osint.backend.service.AuditLogService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -13,6 +15,7 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.ByteArrayOutputStream;
@@ -28,17 +31,21 @@ public class ReportController {
     private final CaseRepository caseRepository;
     private final PersonRecordRepository personRecordRepository;
     private final SourceRecordRepository sourceRecordRepository;
+    private final AuditLogService auditLogService;
 
     public ReportController(CaseRepository caseRepository,
                             PersonRecordRepository personRecordRepository,
-                            SourceRecordRepository sourceRecordRepository) {
+                            SourceRecordRepository sourceRecordRepository,
+                            AuditLogService auditLogService) {
         this.caseRepository = caseRepository;
         this.personRecordRepository = personRecordRepository;
         this.sourceRecordRepository = sourceRecordRepository;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/case/{caseId}/pdf")
-    public ResponseEntity<byte[]> exportCaseReport(@PathVariable Long caseId) {
+    public ResponseEntity<byte[]> exportCaseReport(@PathVariable Long caseId,
+                                                   Authentication auth) {
         try {
             CaseRecord caseRecord = caseRepository.findById(caseId)
                     .orElseThrow(() -> new RuntimeException("Case not found"));
@@ -51,6 +58,14 @@ public class ReportController {
             }
 
             byte[] pdf = buildPdf(caseRecord, persons, sources);
+
+            auditLogService.log(
+                    actor(auth),
+                    AuditLog.Action.EXPORT,
+                    "CASE_REPORT",
+                    caseId,
+                    "Exported PDF report for case: " + safe(caseRecord.getTitle())
+            );
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -177,6 +192,10 @@ public class ReportController {
         content.endText();
 
         return y - 18;
+    }
+
+    private String actor(Authentication auth) {
+        return auth != null ? auth.getName() : "unknown";
     }
 
     private String safe(String value) {

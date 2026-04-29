@@ -6,7 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/admin/audit-logs")
+@RequestMapping("/api/audit-logs")
 @CrossOrigin(origins = "http://localhost:5173")
 public class AuditLogController {
 
@@ -16,20 +16,25 @@ public class AuditLogController {
         this.auditLogService = auditLogService;
     }
 
-    /** GET /api/admin/audit-logs?page=0&size=50 */
     @GetMapping
-    public Page<AuditLog> getAll(
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "50") int size) {
-        return auditLogService.getAll(page, size);
-    }
+    public Page<AuditLog> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(required = false) String actor,
+            @RequestParam(required = false) String action
+    ) {
+        if (actor != null && !actor.isBlank()) {
+            return auditLogService.getByActor(actor, page, size);
+        }
 
-    /** GET /api/admin/audit-logs/user/{username}?page=0&size=50 */
-    @GetMapping("/user/{username}")
-    public Page<AuditLog> getByActor(
-            @PathVariable String username,
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "50") int size) {
-        return auditLogService.getByActor(username, page, size);
+        if (action != null && !action.isBlank()) {
+            return auditLogService.getByAction(
+                    AuditLog.Action.valueOf(action.toUpperCase()),
+                    page,
+                    size
+            );
+        }
+
+        return auditLogService.getAll(page, size);
     }
 }

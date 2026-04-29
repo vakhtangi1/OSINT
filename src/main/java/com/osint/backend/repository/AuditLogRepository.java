@@ -9,5 +9,13 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     Page<AuditLog> findAllByOrderByTimestampDesc(Pageable pageable);
 
-    Page<AuditLog> findByActorOrderByTimestampDesc(String actor, Pageable pageable);
+    Page<AuditLog> findByActorContainingIgnoreCaseOrderByTimestampDesc(
+            String actor,
+            Pageable pageable
+    );
+
+    Page<AuditLog> findByActionOrderByTimestampDesc(
+            AuditLog.Action action,
+            Pageable pageable
+    );
 }

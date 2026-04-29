@@ -60,6 +60,18 @@ public class PersonRecordService {
         return personRecordRepository.findByFullNameContainingIgnoreCase(name);
     }
 
+    public List<PersonRecord> searchByFullName(String name, String actor) {
+        auditLogService.log(
+                actor,
+                AuditLog.Action.SEARCH,
+                "PERSON_RECORD",
+                null,
+                "Searched person by name: " + safe(name)
+        );
+
+        return searchByFullName(name);
+    }
+
     public List<PersonRecord> globalSearch(String query) {
         if (query == null || query.isBlank()) {
             return personRecordRepository.findAll();
@@ -78,6 +90,18 @@ public class PersonRecordService {
         }
 
         return personRecordRepository.searchBySearchText(cleanQuery);
+    }
+
+    public List<PersonRecord> globalSearch(String query, String actor) {
+        auditLogService.log(
+                actor,
+                AuditLog.Action.SEARCH,
+                "PERSON_RECORD",
+                null,
+                "Global search query used"
+        );
+
+        return globalSearch(query);
     }
 
     public PersonRecord updateRecord(Long id, PersonRecord updatedRecord, String actor) {

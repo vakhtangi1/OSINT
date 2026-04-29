@@ -41,16 +41,19 @@ public class PersonRecordController {
 
     @GetMapping("/search")
     public List<PersonRecord> search(@RequestParam(required = false) String name,
-                                     @RequestParam(required = false) String query) {
+                                     @RequestParam(required = false) String query,
+                                     Authentication auth) {
         if (query != null && !query.isBlank()) {
-            return personRecordService.globalSearch(query);
+            return personRecordService.globalSearch(query, actor(auth));
         }
-        return personRecordService.searchByFullName(name == null ? "" : name);
+
+        return personRecordService.searchByFullName(name == null ? "" : name, actor(auth));
     }
 
     @GetMapping("/global-search")
-    public List<PersonRecord> globalSearch(@RequestParam String query) {
-        return personRecordService.globalSearch(query);
+    public List<PersonRecord> globalSearch(@RequestParam String query,
+                                           Authentication auth) {
+        return personRecordService.globalSearch(query, actor(auth));
     }
 
     @PutMapping("/{id}")
@@ -61,12 +64,13 @@ public class PersonRecordController {
     }
 
     @DeleteMapping("/{id}")
-    public String deleteRecord(@PathVariable Long id, Authentication auth) {
+    public String deleteRecord(@PathVariable Long id,
+                               Authentication auth) {
         personRecordService.deleteRecord(id, actor(auth));
         return "Person record deleted successfully";
     }
 
     private String actor(Authentication auth) {
-        return (auth != null) ? auth.getName() : "unknown";
+        return auth != null ? auth.getName() : "unknown";
     }
 }
