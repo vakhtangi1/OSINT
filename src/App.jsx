@@ -1,8 +1,38 @@
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import AuthPage from "./AuthPage";
+import { logout, apiFetch } from "./api";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import "./App.css";
 
 const API = "http://localhost:8080/api";
+
+function TopUserBar({ onLogout }) {
+  return (
+      <div className="top-user-bar">
+      <span>
+        Logged in as {localStorage.getItem("username")} (
+        {localStorage.getItem("role")})
+      </span>
+
+        <button
+            className="logout-btn"
+            onClick={() => {
+              logout();
+              onLogout();
+            }}
+        >
+          Logout
+        </button>
+      </div>
+  );
+}
 
 function Dashboard() {
   const [cases, setCases] = useState([]);
@@ -23,8 +53,7 @@ function Dashboard() {
 
   async function loadCases() {
     try {
-      const res = await fetch(`${API}/cases`);
-      const data = await res.json();
+      const data = await apiFetch("/cases");
       setCases(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -38,12 +67,11 @@ function Dashboard() {
       return;
     }
 
-    const url = editingId ? `${API}/cases/${editingId}` : `${API}/cases`;
+    const path = editingId ? `/cases/${editingId}` : `/cases`;
     const method = editingId ? "PUT" : "POST";
 
-    await fetch(url, {
+    await apiFetch(path, {
       method,
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
 
@@ -65,7 +93,7 @@ function Dashboard() {
   async function deleteCase(id) {
     if (!window.confirm("Delete this case?")) return;
 
-    await fetch(`${API}/cases/${id}`, {
+    await apiFetch(`/cases/${id}`, {
       method: "DELETE",
     });
 
@@ -90,17 +118,23 @@ function Dashboard() {
       {
         title: "LinkedIn Profile Search",
         query: `site:linkedin.com/in ${exact}`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(`site:linkedin.com/in ${exact}`)}`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(
+            `site:linkedin.com/in ${exact}`
+        )}`,
       },
       {
         title: "GitHub Search",
         query: `site:github.com ${exact}`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(`site:github.com ${exact}`)}`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(
+            `site:github.com ${exact}`
+        )}`,
       },
       {
         title: "PDF Documents",
         query: `${exact} filetype:pdf`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(`${exact} filetype:pdf`)}`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(
+            `${exact} filetype:pdf`
+        )}`,
       },
       {
         title: "DuckDuckGo",
@@ -113,7 +147,9 @@ function Dashboard() {
       list.push({
         title: "Email Exposure",
         query: `${exact} email OR contact`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(`${exact} email OR contact`)}`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(
+            `${exact} email OR contact`
+        )}`,
       });
     }
 
@@ -121,7 +157,9 @@ function Dashboard() {
       list.push({
         title: "Phone Exposure",
         query: `${exact} phone OR mobile`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(`${exact} phone OR mobile`)}`,
+        url: `https://www.google.com/search?q=${encodeURIComponent(
+            `${exact} phone OR mobile`
+        )}`,
       });
     }
 
@@ -153,7 +191,9 @@ function Dashboard() {
             <input
                 placeholder="Case description"
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                }
             />
 
             <select
@@ -181,7 +221,10 @@ function Dashboard() {
                 onChange={(e) => setQuery(e.target.value)}
             />
 
-            <select value={queryType} onChange={(e) => setQueryType(e.target.value)}>
+            <select
+                value={queryType}
+                onChange={(e) => setQueryType(e.target.value)}
+            >
               <option>General</option>
               <option>Email</option>
               <option>Phone</option>
@@ -249,10 +292,16 @@ function Dashboard() {
                         <td>{formatDate(c.createdAt)}</td>
                         <td>
                           <div className="action-row">
-                            <button className="edit-btn" onClick={() => editCase(c)}>
+                            <button
+                                className="edit-btn"
+                                onClick={() => editCase(c)}
+                            >
                               Edit
                             </button>
-                            <button className="delete-btn" onClick={() => deleteCase(c.id)}>
+                            <button
+                                className="delete-btn"
+                                onClick={() => deleteCase(c.id)}
+                            >
                               Delete
                             </button>
                           </div>
@@ -298,14 +347,12 @@ function CaseDetails() {
   }, [id]);
 
   async function loadCase() {
-    const res = await fetch(`${API}/cases/${id}`);
-    const data = await res.json();
+    const data = await apiFetch(`/cases/${id}`);
     setCaseData(data);
   }
 
   async function loadPeople() {
-    const res = await fetch(`${API}/person-records/case/${id}`);
-    const data = await res.json();
+    const data = await apiFetch(`/person-records/case/${id}`);
     setPeople(Array.isArray(data) ? data : []);
   }
 
@@ -319,9 +366,8 @@ function CaseDetails() {
       return;
     }
 
-    await fetch(`${API}/person-records`, {
+    await apiFetch("/person-records", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...personForm,
         caseId: Number(id),
@@ -352,7 +398,7 @@ function CaseDetails() {
   async function deletePerson(personId) {
     if (!window.confirm("Delete person?")) return;
 
-    await fetch(`${API}/person-records/${personId}`, {
+    await apiFetch(`/person-records/${personId}`, {
       method: "DELETE",
     });
 
@@ -482,8 +528,7 @@ function PersonDetails() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`${API}/person-records/${id}`);
-      const data = await res.json();
+      const data = await apiFetch(`/person-records/${id}`);
       setPerson(data);
     }
 
@@ -551,8 +596,18 @@ function formatDate(value) {
 }
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(
+      !!localStorage.getItem("token")
+  );
+
+  if (!isLoggedIn) {
+    return <AuthPage onAuth={() => setIsLoggedIn(true)} />;
+  }
+
   return (
       <BrowserRouter>
+        <TopUserBar onLogout={() => setIsLoggedIn(false)} />
+
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/case/:id" element={<CaseDetails />} />
